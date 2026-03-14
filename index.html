@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EduComment IA</title>
+<meta name="description" content="Assistant pédagogique IA pour la génération de commentaires scolaires">
+<meta name="theme-color" content="#1D9E75">
+<link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;EduComment IA&quot;,&quot;short_name&quot;:&quot;EduComment&quot;,&quot;start_url&quot;:&quot;/&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;theme_color&quot;:&quot;#1D9E75&quot;,&quot;background_color&quot;:&quot;#ffffff&quot;}">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --green: #1D9E75; --green-l: #E1F5EE; --green-b: #5DCAA5; --green-d: #0F6E56;
+    --amber: #854F0B; --amber-l: #FAEEDA; --amber-b: #EF9F27;
+    --blue: #185FA5; --blue-l: #E6F1FB; --blue-b: #85B7EB;
+    --red: #A32D2D; --red-l: #FCEBEB;
+    --bg: #f5f5f3; --surface: #ffffff; --border: rgba(0,0,0,0.1);
+    --text: #1a1a18; --text2: #5f5e5a; --text3: #888780;
+    --radius: 10px; --radius-sm: 7px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18; --surface: #242422; --border: rgba(255,255,255,0.1);
+      --text: #e8e6de; --text2: #a8a69e; --text3: #6a6860;
+      --green-l: #0a2e22; --amber-l: #2a1c06; --blue-l: #071a30; --red-l: #2a0d0d;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; height: 100vh; overflow: hidden; }
+  .app { display: flex; height: 100vh; }
+
+  /* SIDEBAR */
+  .sidebar { width: 210px; min-width: 210px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 0.9rem 0; overflow-y: auto; }
+  .logo { padding: 0 1rem 0.85rem; border-bottom: 1px solid var(--border); margin-bottom: 0.5rem; }
+  .logo-t { font-size: 15px; font-weight: 600; color: var(--text); }
+  .logo-s { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .nav-section { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; padding: 8px 1rem 3px; }
+  .nav { display: flex; align-items: center; gap: 8px; padding: 7px 1rem; cursor: pointer; font-size: 13px; color: var(--text2); transition: background 0.1s; border-radius: 0; }
+  .nav:hover { background: var(--bg); color: var(--text); }
+  .nav.on { background: var(--green-l); color: var(--green-d); font-weight: 600; }
+  .nav svg { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.6; }
+  .nav-badge { margin-left: auto; font-size: 10px; padding: 1px 6px; border-radius: 99px; background: var(--amber-l); color: var(--amber); }
+  .sidebar-footer { margin-top: auto; padding: 0.75rem 1rem; border-top: 1px solid var(--border); }
+  .api-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text3); cursor: pointer; }
+  .api-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); }
+  .api-dot.ok { background: var(--green); }
+
+  /* MAIN */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.6rem 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .tb-t { font-size: 15px; font-weight: 600; color: var(--text); }
+  .tb-s { font-size: 12px; color: var(--text3); margin-top: 1px; }
+  .content { flex: 1; overflow-y: auto; padding: 1.1rem; }
+  .screen { display: none; }
+  .screen.on { display: block; }
+
+  /* COMPONENTS */
+  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .bs { background: #EAF3DE; color: #3B6D11; }
+  .bw { background: var(--amber-l); color: var(--amber); }
+  .bd { background: var(--red-l); color: var(--red); }
+  .bi { background: var(--blue-l); color: var(--blue); }
+  .bg { background: var(--bg); color: var(--text3); border: 1px solid var(--border); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; margin-bottom: 0.9rem; }
+  .sec { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.6rem; }
+  .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 9px; margin-bottom: 1rem; }
+  .stat { background: var(--bg); border-radius: var(--radius-sm); padding: 0.8rem; }
+  .stat-l { font-size: 11px; color: var(--text3); margin-bottom: 3px; }
+  .stat-v { font-size: 22px; font-weight: 600; color: var(--text); }
+  .class-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(145px,1fr)); gap: 9px; }
+  .cc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.9rem; cursor: pointer; transition: border-color 0.15s; }
+  .cc:hover { border-color: var(--green-b); }
+  .cc-n { font-size: 14px; font-weight: 600; color: var(--text); }
+  .cc-s { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .cc-bar { margin-top: 9px; height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden; }
+  .cc-fill { height: 100%; background: var(--green); border-radius: 2px; }
+  .back { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--text3); cursor: pointer; margin-bottom: 0.8rem; }
+  .back:hover { color: var(--text); }
+  .slist { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .srow { display: flex; align-items: center; padding: 9px 1rem; gap: 9px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  .srow:last-child { border-bottom: none; }
+  .srow:hover { background: var(--bg); }
+  .av { width: 30px; height: 30px; border-radius: 50%; background: var(--green-l); color: var(--green-d); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+  .pill { padding: 3px 10px; border-radius: 99px; font-size: 11px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text2); transition: all 0.1s; }
+  .pill.on { background: var(--green-l); color: var(--green-d); border-color: var(--green-b); font-weight: 600; }
+  .pill-row { display: flex; flex-wrap: wrap; gap: 4px; }
+  .btn-p { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 16px; background: var(--green); color: white; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
+  .btn-p:hover { opacity: 0.88; }
+  .btn-p:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-s { padding: 7px 13px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; background: var(--surface); color: var(--text2); }
+  .btn-s:hover { background: var(--bg); color: var(--text); }
+  .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.9rem; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+  .ph { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.9rem 1.1rem; display: flex; align-items: center; gap: 1rem; margin-bottom: 0.9rem; flex-wrap: wrap; }
+  .pav { width: 44px; height: 44px; border-radius: 50%; background: var(--green-l); color: var(--green-d); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; flex-shrink: 0; }
+  .cur-row { margin-bottom: 0.75rem; }
+  .cur-lbl { display: flex; justify-content: space-between; font-size: 12px; color: var(--text3); margin-bottom: 4px; }
+  .cur-lbl span:last-child { font-weight: 600; color: var(--text); }
+  .cur-track { height: 6px; background: var(--bg); border-radius: 3px; position: relative; cursor: pointer; }
+  .cur-fill { height: 100%; border-radius: 3px; background: var(--green); transition: width 0.18s; }
+  .cur-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--surface); border: 2px solid var(--green); position: absolute; top: -4px; transform: translateX(-50%); transition: left 0.18s; }
+  .hc { font-size: 12px; color: var(--text2); line-height: 1.6; padding: 8px 10px; background: var(--bg); border-radius: var(--radius-sm); margin-bottom: 6px; }
+  .hc.t2active { color: var(--text); background: var(--surface); border: 1px solid var(--blue-b); }
+  .hl { font-size: 11px; font-weight: 600; color: var(--text3); margin-bottom: 3px; }
+  .cat-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 0.6rem; }
+  .ctab { padding: 4px 10px; border-radius: 99px; font-size: 11px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text2); transition: all 0.1s; white-space: nowrap; }
+  .kw-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 0.6rem; }
+  .kw-row { display: flex; align-items: center; gap: 7px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .kw-row.active { border-color: var(--green-b); }
+  .kw-chk { width: 15px; height: 15px; border-radius: 3px; border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all 0.1s; background: var(--surface); }
+  .kw-chk.on { background: var(--green); border-color: var(--green); }
+  .kw-chk.on::after { content: ''; display: block; width: 7px; height: 4px; border-left: 1.5px solid white; border-bottom: 1.5px solid white; transform: rotate(-45deg) translateY(-1px); }
+  .kw-inp { font-size: 12px; color: var(--text); background: transparent; border: none; outline: none; font-family: inherit; flex: 1; min-width: 0; }
+  .w-dots { display: flex; gap: 3px; }
+  .w-dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--border); cursor: pointer; background: var(--surface); }
+  .w-dot.on { border-color: var(--green); background: var(--green); }
+  .w-lbl { font-size: 10px; min-width: 30px; text-align: right; }
+  .kw-del { font-size: 14px; color: var(--text3); border: none; background: transparent; cursor: pointer; width: 18px; flex-shrink: 0; }
+  .kw-del:hover { color: var(--red); }
+  .add-row { display: flex; gap: 5px; }
+  .add-inp { flex: 1; padding: 6px 9px; font-size: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; color: var(--text); background: var(--surface); }
+  .add-inp:focus { outline: none; border-color: var(--green); }
+  .add-btn { padding: 6px 11px; background: var(--green-l); color: var(--green-d); border: none; border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; font-weight: 600; }
+  .gen-btn { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 0; background: var(--green); color: white; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; border: none; width: 100%; margin-bottom: 0.6rem; transition: opacity 0.15s; }
+  .gen-btn:hover { opacity: 0.88; }
+  .gen-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .vcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem; cursor: pointer; margin-bottom: 7px; transition: border-color 0.15s; }
+  .vcard:hover { border-color: var(--green-b); }
+  .vcard.sel { border: 2px solid var(--green); }
+  .vcard.flagged { border-color: var(--amber-b); }
+  .vhdr { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .vnum { width: 20px; height: 20px; border-radius: 50%; background: var(--green-l); color: var(--green-d); font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .vnum.w { background: var(--amber-l); color: var(--amber); }
+  .sp { font-size: 10px; padding: 2px 6px; border-radius: 99px; }
+  .sg { background: #EAF3DE; color: #3B6D11; }
+  .sa { background: var(--amber-l); color: var(--amber); }
+  .sr { background: var(--red-l); color: var(--red); }
+  .vt { font-size: 13px; color: var(--text); line-height: 1.6; }
+  .final-ta { width: 100%; padding: 9px 11px; font-size: 13px; line-height: 1.6; border: 1px solid var(--border); border-radius: var(--radius-sm); resize: vertical; font-family: inherit; color: var(--text); background: var(--surface); min-height: 80px; }
+  .final-ta:focus { outline: none; border-color: var(--green); }
+  .act-row { display: flex; gap: 5px; margin-top: 6px; flex-wrap: wrap; }
+  .act { padding: 5px 11px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; background: var(--surface); color: var(--text2); }
+  .act:hover { background: var(--bg); color: var(--text); }
+  .act.p { background: var(--green); color: white; border-color: var(--green); }
+  .sb-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .sb-l { font-size: 11px; color: var(--text3); min-width: 85px; }
+  .sb-t { flex: 1; height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden; }
+  .sb-f { height: 100%; border-radius: 2px; transition: width 0.4s; }
+  .sb-v { font-size: 11px; font-weight: 600; min-width: 28px; text-align: right; color: var(--text); }
+  .alert-box { background: var(--amber-l); border: 1px solid var(--amber-b); border-radius: var(--radius-sm); padding: 8px 11px; font-size: 12px; color: var(--amber); margin-bottom: 0.65rem; }
+  .success-box { background: #EAF3DE; border: 1px solid #97C459; border-radius: var(--radius-sm); padding: 8px 11px; font-size: 12px; color: #3B6D11; margin-bottom: 0.65rem; }
+  .progress-track { height: 5px; background: var(--bg); border-radius: 3px; overflow: hidden; margin: 5px 0; }
+  .progress-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width 0.4s; }
+  .mass-row { display: flex; align-items: flex-start; gap: 9px; padding: 9px 1rem; border-bottom: 1px solid var(--border); }
+  .mass-row:last-child { border-bottom: none; }
+  .si { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; margin-top: 2px; }
+  .si-w { background: var(--bg); color: var(--text3); }
+  .si-p { background: var(--green-l); color: var(--green-d); }
+  .si-d { background: #EAF3DE; color: #3B6D11; }
+  .si-e { background: var(--red-l); color: var(--red); }
+  .cp { font-size: 12px; color: var(--text3); line-height: 1.55; margin-top: 4px; padding: 6px 8px; background: var(--bg); border-radius: var(--radius-sm); }
+  .cp.done { color: var(--text); background: var(--green-l); border: 1px solid var(--green-b); }
+  .upload-zone { border: 1.5px dashed var(--border); border-radius: var(--radius); padding: 2rem; text-align: center; cursor: pointer; transition: border-color 0.2s; }
+  .upload-zone:hover { border-color: var(--green); background: var(--green-l); }
+  .toggle-lnk { font-size: 11px; color: var(--text3); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .toggle-lnk:hover { color: var(--text); }
+  mark.rep { background: var(--amber-l); color: var(--amber); border-radius: 2px; padding: 0 1px; }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .modal { background: var(--surface); border-radius: var(--radius); padding: 1.5rem; width: 420px; max-width: 95vw; border: 1px solid var(--border); }
+  .modal h2 { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 0.5rem; }
+  .modal p { font-size: 13px; color: var(--text2); line-height: 1.6; margin-bottom: 1rem; }
+  .modal input { width: 100%; padding: 9px 11px; font-size: 13px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; color: var(--text); background: var(--bg); margin-bottom: 1rem; }
+  .modal input:focus { outline: none; border-color: var(--green); }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    .sidebar { width: 0; min-width: 0; overflow: hidden; position: fixed; z-index: 50; height: 100vh; transition: width 0.2s; }
+    .sidebar.open { width: 210px; min-width: 210px; }
+    .three-col { grid-template-columns: 1fr; }
+    .stat-grid { grid-template-columns: repeat(2,1fr); }
+    .two-col { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- MODAL CLÉ API -->
+<div class="modal-overlay" id="api-modal" style="display:none">
+  <div class="modal">
+    <h2>🔑 Clé API Anthropic</h2>
+    <p>Pour générer des commentaires avec l'IA, entrez votre clé API Anthropic. Elle est sauvegardée localement sur votre appareil et n'est jamais envoyée ailleurs.</p>
+    <p>Créez une clé sur <a href="https://console.anthropic.com" target="_blank" style="color:var(--green)">console.anthropic.com</a> → API Keys.</p>
+    <input type="password" id="api-input" placeholder="sk-ant-..." autocomplete="off">
+    <div class="modal-actions">
+      <button class="btn-s" onclick="closeApiModal()">Annuler</button>
+      <button class="btn-p" onclick="saveApiKey()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <div class="logo">
+      <div class="logo-t">EduComment IA</div>
+      <div class="logo-s">V2.1 — Assistant pédagogique</div>
+    </div>
+    <div class="nav-section">Vue globale</div>
+    <div class="nav on" id="nav-db" onclick="go('db')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+      Tableau de bord
+    </div>
+    <div class="nav" id="nav-imp" onclick="go('imp')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 10v4h12v-4M8 2v8M5 7l3 3 3-3"/></svg>
+      Import Excel
+    </div>
+    <div class="nav-section">Classes</div>
+    <div class="nav" id="nav-cl" onclick="go('cl')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5" cy="5" r="2.5"/><path d="M1 14c0-2.2 1.8-4 4-4s4 1.8 4 4"/><circle cx="11" cy="5" r="2.5"/><path d="M11 9c1.2 0 2.3.5 3.1 1.3"/></svg>
+      Par élève
+    </div>
+    <div class="nav" id="nav-masse" onclick="go('masse')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 4h14M1 8h14M1 12h8"/><circle cx="13" cy="12" r="2.5"/></svg>
+      Génération en masse
+      <span class="nav-badge" id="nb-reste">0</span>
+    </div>
+    <div class="sidebar-footer">
+      <div class="api-status" id="api-status" onclick="openApiModal()">
+        <div class="api-dot" id="api-dot"></div>
+        <span id="api-label">Configurer la clé API</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="tb-t" id="tbt">Tableau de bord</div>
+        <div class="tb-s" id="tbs">Vue d'ensemble</div>
+      </div>
+      <div style="display:flex;gap:7px;align-items:center">
+        <span class="badge bi" id="tb-tri">Trimestre 2</span>
+        <span class="badge bg" id="tb-prog">0 / 0</span>
+        <button class="btn-s" onclick="toggleSidebar()" style="display:none;padding:6px 10px" id="menu-btn">☰</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div class="screen on" id="sc-db">
+        <div class="stat-grid">
+          <div class="stat"><div class="stat-l">Élèves</div><div class="stat-v" id="db-total">0</div></div>
+          <div class="stat"><div class="stat-l">Rédigés</div><div class="stat-v" id="db-done" style="color:var(--green)">0</div></div>
+          <div class="stat"><div class="stat-l">Restants</div><div class="stat-v" id="db-rest">0</div></div>
+          <div class="stat"><div class="stat-l">Trimestre</div><div class="stat-v">T2</div></div>
+        </div>
+        <div class="sec">Mes classes</div>
+        <div class="class-grid" id="db-classes">
+          <div class="cc" style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text3)">
+            Importez un fichier Excel pour commencer →
+            <button class="btn-p" style="margin-top:1rem;display:block;width:fit-content;margin:1rem auto 0" onclick="go('imp')">Import Excel</button>
+          </div>
+        </div>
+        <div style="margin-top:1rem">
+          <div class="sec">Alertes IA</div>
+          <div id="db-alerts" style="font-size:13px;color:var(--text3)">Aucune alerte.</div>
+        </div>
+      </div>
+
+      <!-- IMPORT -->
+      <div class="screen" id="sc-imp">
+        <div class="card">
+          <div class="sec">Import Excel — détection automatique</div>
+          <div class="upload-zone" id="drop-zone"
+            onclick="document.getElementById('fi').click()"
+            ondragover="event.preventDefault();this.style.background='var(--green-l)'"
+            ondragleave="this.style.background=''"
+            ondrop="handleDrop(event)">
+            <div style="font-size:28px;margin-bottom:0.5rem">📊</div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px">Déposez votre fichier ici</div>
+            <div style="font-size:12px;color:var(--text3)">.xlsx, .xls ou .csv — colonnes détectées automatiquement</div>
+            <button style="margin-top:0.85rem;padding:7px 18px;background:var(--green-l);color:var(--green-d);border:none;border-radius:var(--radius-sm);font-size:13px;cursor:pointer;font-weight:600" onclick="event.stopPropagation();document.getElementById('fi').click()">Choisir un fichier</button>
+          </div>
+          <input type="file" id="fi" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(this)">
+          <div id="imp-res" style="margin-top:0.85rem"></div>
+        </div>
+        <div class="card">
+          <div class="sec">Données démo</div>
+          <div style="font-size:13px;color:var(--text2);margin-bottom:0.7rem">Teste l'application avec 8 élèves fictifs de 3ème A.</div>
+          <button class="btn-p" onclick="loadDemo()">▶ Charger les données démo</button>
+        </div>
+        <div class="card">
+          <div class="sec">Format attendu</div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.7">
+            Colonnes reconnues automatiquement : <strong>Nom</strong>, <strong>Prénom</strong>, <strong>Classe</strong>, <strong>Moyenne T2</strong> (ou Moy, Note…), <strong>Moyenne T1</strong> (ou T1, Précédent…), <strong>Absences</strong> (ou Abs…).<br>
+            Export Pronote, OpenDocument et Excel standard supportés.
+          </div>
+        </div>
+      </div>
+
+      <!-- CLASSES par élève -->
+      <div class="screen" id="sc-cl">
+        <div id="v-cls">
+          <div class="sec">Choisir une classe</div>
+          <div class="class-grid" id="v-cls-grid"></div>
+        </div>
+        <div id="v-stu" style="display:none">
+          <div class="back" onclick="showCls()">← Classes</div>
+          <div id="stu-content"></div>
+        </div>
+        <div id="v-pro" style="display:none">
+          <div class="back" onclick="showStu()">← Retour à la classe</div>
+          <div id="pro-content"></div>
+        </div>
+      </div>
+
+      <!-- MASSE -->
+      <div class="screen" id="sc-masse">
+        <div id="m-config">
+          <div class="card">
+            <div class="sec">Classe</div>
+            <div style="display:flex;gap:7px;flex-wrap:wrap" id="m-cls-pills"></div>
+          </div>
+          <div class="card">
+            <div class="sec">Paramètres</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+              <div>
+                <div style="font-size:12px;color:var(--text3);margin-bottom:4px">Ton</div>
+                <div class="pill-row" id="m-tone">
+                  <div class="pill on" onclick="mTone('bienveillant',this)">bienveillant</div>
+                  <div class="pill" onclick="mTone('neutre',this)">neutre</div>
+                  <div class="pill" onclick="mTone('ferme',this)">ferme</div>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:12px;color:var(--text3);margin-bottom:4px">Longueur</div>
+                <div class="pill-row" id="m-len">
+                  <div class="pill" onclick="mLen('court',this)">court</div>
+                  <div class="pill on" onclick="mLen('standard',this)">standard</div>
+                  <div class="pill" onclick="mLen('long',this)">long</div>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:12px;color:var(--text3);margin-bottom:4px">Élèves</div>
+                <div class="pill-row" id="m-filt">
+                  <div class="pill on" onclick="mFilt('tous',this)">Tous</div>
+                  <div class="pill" onclick="mFilt('restants',this)">Sans commentaire</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem">
+              <div class="sec" style="margin:0">Aperçu</div>
+              <span style="font-size:12px;color:var(--text3)">~<span id="m-est">0</span> min estimées</span>
+            </div>
+            <div style="display:flex;gap:10px;margin-bottom:0.75rem;flex-wrap:wrap">
+              <span class="badge bg"><span id="m-nb">0</span> élèves</span>
+              <span class="badge bs"><span id="m-done-nb">0</span> rédigés</span>
+              <span class="badge bw"><span id="m-todo">0</span> à générer</span>
+            </div>
+            <div class="slist" id="m-preview"></div>
+          </div>
+          <button class="btn-p" style="width:100%;padding:10px" onclick="massStart()">✦ Lancer la génération</button>
+        </div>
+        <div id="m-running" style="display:none">
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem">
+              <div class="sec" style="margin:0">Génération en cours</div>
+              <div style="font-size:13px;font-weight:600;color:var(--text)" id="m-cnt">0 / 0</div>
+            </div>
+            <div class="progress-track"><div class="progress-fill" id="m-bar" style="width:0%"></div></div>
+            <div style="font-size:12px;color:var(--text3);margin-top:4px" id="m-status">Initialisation…</div>
+          </div>
+          <div class="slist" id="m-run-list"></div>
+        </div>
+        <div id="m-results" style="display:none">
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div>
+                <div style="font-size:14px;font-weight:600;color:var(--text)" id="m-res-title">—</div>
+                <div style="font-size:12px;color:var(--text3);margin-top:2px" id="m-res-sub">—</div>
+              </div>
+              <button class="btn-s" onclick="mReset()">← Recommencer</button>
+            </div>
+            <div class="progress-track" style="margin-top:0.75rem"><div class="progress-fill" style="width:100%"></div></div>
+          </div>
+          <div style="display:flex;gap:7px;margin-bottom:0.85rem;flex-wrap:wrap">
+            <button class="btn-p" onclick="exportAll()">↓ Exporter CSV</button>
+            <button class="btn-s" onclick="copyAll()">Copier tout</button>
+          </div>
+          <div class="slist" id="m-res-list"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONSTANTES ────────────────────────────────────────────────────────────────
+const CL = {
+  travail: ['Faible','Moyen','Bon','Très bon'],
+  attitude: ['Faible','Moyen','Bonne','Très bonne'],
+  participation: ['Faible','Moyenne','Bonne','Très bonne'],
+  autonomie: ['Faible','Moyenne','Bonne','Très bonne'],
+  methode: ['Faible','Moyenne','Bonne','Très bonne'],
+  progres: ['En recul','Stable','En progrès','En forte progression']
+};
+const CATS = [
+  {id:'points_forts', label:'Points forts', color:'#0F6E56', bg:'#E1F5EE', border:'#5DCAA5'},
+  {id:'axes', label:'Axes de progrès', color:'#854F0B', bg:'#FAEEDA', border:'#EF9F27'},
+  {id:'bilan', label:'Bilan', color:'#185FA5', bg:'#E6F1FB', border:'#85B7EB'},
+  {id:'attitude', label:'Attitude', color:'#72243E', bg:'#FBEAF0', border:'#ED93B1'},
+  {id:'encouragements', label:'Encouragements', color:'#3C3489', bg:'#EEEDFE', border:'#AFA9EC'},
+];
+const FIELD_DEFS = [
+  {id:'nom', label:'Nom', req:true, aliases:['nom','last','surname','family']},
+  {id:'prenom', label:'Prénom', req:true, aliases:['prénom','prenom','first','given','firstname']},
+  {id:'classe', label:'Classe', req:false, aliases:['classe','class','group','groupe','division']},
+  {id:'moy_t2', label:'Moyenne T2', req:true, aliases:['moy','moyenne','note','avg','t2','trim2','trimestre2','moy_t2','moy t2']},
+  {id:'moy_t1', label:'Moyenne T1', req:false, aliases:['t1','trim1','trimestre1','moy_t1','moy t1','precedent','précédent']},
+  {id:'absences', label:'Absences', req:false, aliases:['abs','absence','absences','absent']},
+];
+
+// ─── ÉTAT GLOBAL ───────────────────────────────────────────────────────────────
+let STUDENTS = [];
+let KWS = {
+  points_forts: [{id:1,text:'rigueur dans le travail',active:true,weight:3},{id:2,text:'bonne maîtrise des bases',active:true,weight:2},{id:3,text:'efforts constants',active:true,weight:3},{id:4,text:'raisonnement structuré',active:false,weight:1}],
+  axes: [{id:5,text:"manque d'autonomie",active:true,weight:2},{id:6,text:'participation à renforcer',active:false,weight:1},{id:7,text:'méthode à consolider',active:false,weight:1}],
+  bilan: [{id:8,text:'résultats en hausse',active:true,weight:3},{id:9,text:'trimestre positif',active:true,weight:2},{id:10,text:'niveau satisfaisant',active:false,weight:1}],
+  attitude: [{id:11,text:'investissement régulier',active:true,weight:2},{id:12,text:'élève attentif',active:false,weight:1}],
+  encouragements: [{id:13,text:'à poursuivre dans cette voie',active:true,weight:3},{id:14,text:'des progrès encourageants',active:true,weight:2}],
+};
+let nextKwId = 20, curCat = 'points_forts', kwExpanded = false;
+let curClass = '', curStudent = null, variants = [], selIdx = null;
+let tone = 'bienveillant', varLen = 'standard', varNb = 3;
+let mClass = '', mToneV = 'bienveillant', mLenV = 'standard', mFiltV = 'tous';
+
+// ─── PERSISTANCE localStorage ──────────────────────────────────────────────────
+function saveData() {
+  try {
+    localStorage.setItem('educomment_students', JSON.stringify(STUDENTS));
+    localStorage.setItem('educomment_kws', JSON.stringify(KWS));
+  } catch(e) {}
+}
+function loadData() {
+  try {
+    const s = localStorage.getItem('educomment_students');
+    const k = localStorage.getItem('educomment_kws');
+    if (s) STUDENTS = JSON.parse(s);
+    if (k) KWS = JSON.parse(k);
+  } catch(e) {}
+}
+
+// ─── CLÉ API ───────────────────────────────────────────────────────────────────
+function getApiKey() { return localStorage.getItem('educomment_api_key') || ''; }
+function saveApiKey() {
+  const v = document.getElementById('api-input').value.trim();
+  if (!v) return;
+  localStorage.setItem('educomment_api_key', v);
+  closeApiModal();
+  updateApiStatus();
+}
+function openApiModal() {
+  document.getElementById('api-input').value = getApiKey();
+  document.getElementById('api-modal').style.display = 'flex';
+}
+function closeApiModal() { document.getElementById('api-modal').style.display = 'none'; }
+function updateApiStatus() {
+  const has = !!getApiKey();
+  document.getElementById('api-dot').className = 'api-dot' + (has ? ' ok' : '');
+  document.getElementById('api-label').textContent = has ? 'Clé API configurée' : 'Configurer la clé API';
+}
+
+// ─── NAVIGATION ────────────────────────────────────────────────────────────────
+function go(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  document.querySelectorAll('.nav').forEach(n => n.classList.remove('on'));
+  document.getElementById('sc-' + id).classList.add('on');
+  document.getElementById('nav-' + id)?.classList.add('on');
+  const T = {db:'Tableau de bord', imp:'Import Excel', cl:'Classes — par élève', masse:'Génération en masse'};
+  const S = {db:"Vue d'ensemble", imp:'Charger un fichier .xlsx ou .csv', cl:'Rédiger les commentaires par élève', masse:'Générer tous les commentaires d\'une classe'};
+  document.getElementById('tbt').textContent = T[id] || '';
+  document.getElementById('tbs').textContent = S[id] || '';
+  if (id === 'masse') renderMassConfig();
+  if (id === 'db') updateDashboard();
+  if (id === 'cl') renderClassList();
+}
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+
+// ─── DASHBOARD ─────────────────────────────────────────────────────────────────
+function updateDashboard() {
+  const done = STUDENTS.filter(s => s.done).length;
+  const rest = STUDENTS.length - done;
+  document.getElementById('db-total').textContent = STUDENTS.length;
+  document.getElementById('db-done').textContent = done;
+  document.getElementById('db-rest').textContent = rest;
+  document.getElementById('tb-prog').textContent = done + ' / ' + STUDENTS.length;
+  document.getElementById('nb-reste').textContent = rest;
+
+  const classes = [...new Set(STUDENTS.map(s => s.classe))];
+  if (!classes.length) {
+    document.getElementById('db-classes').innerHTML = `<div class="cc" style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text3)">Importez un fichier Excel pour commencer →<button class="btn-p" style="margin:1rem auto 0;display:block" onclick="go('imp')">Import Excel</button></div>`;
+  } else {
+    document.getElementById('db-classes').innerHTML = classes.map(cls => {
+      const stu = STUDENTS.filter(s => s.classe === cls);
+      const d = stu.filter(s => s.done).length;
+      const pct = stu.length ? Math.round(d / stu.length * 100) : 0;
+      return `<div class="cc" onclick="openClass('${cls}')"><div class="cc-n">${cls}</div><div class="cc-s">${stu.length} élèves</div><div class="cc-bar"><div class="cc-fill" style="width:${pct}%"></div></div><div style="font-size:11px;color:var(--text3);margin-top:4px">${d} / ${stu.length}</div></div>`;
+    }).join('');
+  }
+  const alerts = STUDENTS.filter(s => s.abs >= 5 && !s.done);
+  document.getElementById('db-alerts').innerHTML = alerts.length
+    ? alerts.map(s => `<div class="alert-box" style="margin-bottom:5px">⚠ ${s.prenom} ${s.nom} — ${s.abs} absences — commentaire non rédigé</div>`).join('')
+    : '<div style="font-size:13px;color:var(--text3)">Aucune alerte.</div>';
+}
+
+// ─── IMPORT EXCEL ──────────────────────────────────────────────────────────────
+function handleFile(inp) {
+  const f = inp.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = e => parseExcel(e.target.result, f.name);
+  r.readAsArrayBuffer(f);
+}
+function handleDrop(e) {
+  e.preventDefault(); document.getElementById('drop-zone').style.background = '';
+  const f = e.dataTransfer.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => parseExcel(ev.target.result, f.name);
+  r.readAsArrayBuffer(f);
+}
+function parseExcel(buf, fname) {
+  try {
+    const wb = XLSX.read(buf, {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    if (!data.length) { alert('Fichier vide.'); return; }
+    const headers = data[0].map(h => String(h).trim());
+    const rows = data.slice(1).filter(r => r.some(c => c !== ''));
+    const mapped = autoDetectCols(headers);
+    const missing = FIELD_DEFS.filter(f => f.req && mapped[f.id] === undefined);
+    if (missing.length) {
+      document.getElementById('imp-res').innerHTML = `<div class="alert-box">Colonnes obligatoires non trouvées : ${missing.map(f=>f.label).join(', ')}. Vérifiez que votre fichier contient bien ces colonnes.</div>`;
+      return;
+    }
+    const result = processRows(rows, mapped, headers);
+    if (result.students.length) {
+      STUDENTS = [...STUDENTS.filter(s => !result.students.find(n => n.nom===s.nom && n.prenom===s.prenom)), ...result.students];
+      saveData();
+      updateDashboard();
+      document.getElementById('imp-res').innerHTML = `<div class="success-box">✓ ${result.students.length} élève${result.students.length>1?'s':''} importé${result.students.length>1?'s':''} depuis "${fname}"</div>
+        <div class="card"><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          <span class="badge bs">Noms normalisés</span>
+          <span class="badge bs">Moyennes calculées</span>
+          ${result.fixes.length ? `<span class="badge bi">${result.fixes.length} corrections</span>` : ''}
+          ${result.removed > 0 ? `<span class="badge bw">${result.removed} lignes ignorées</span>` : ''}
+        </div>
+        <button class="btn-p" onclick="openClass('${result.students[0]?.classe||''}');go('cl')">Voir les élèves →</button></div>`;
+    }
+  } catch(ex) { alert('Erreur de lecture : ' + ex.message); }
+}
+function autoDetectCols(headers) {
+  const mapped = {};
+  FIELD_DEFS.forEach(f => {
+    const idx = headers.findIndex(h => {
+      const hn = h.toLowerCase().replace(/[\s_\-\.]/g,'');
+      return f.aliases.some(a => hn.includes(a.replace(/[\s_\-\.]/g,'')));
+    });
+    if (idx >= 0) mapped[f.id] = idx;
+  });
+  return mapped;
+}
+function normName(v) { return String(v).trim().toLowerCase().replace(/\s+/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); }
+function normFloat(v) { const s = String(v).trim().replace(',','.').replace(/[^\d.]/g,''); const f = parseFloat(s); return isNaN(f)?null:Math.round(f*10)/10; }
+function processRows(rows, mapped, headers) {
+  const students = [], fixes = []; let removed = 0;
+  const seen = new Set();
+  rows.forEach((row,i) => {
+    const get = id => mapped[id] !== undefined ? row[mapped[id]] : '';
+    let nom = normName(get('nom')), prenom = normName(get('prenom'));
+    const classe = String(get('classe')).trim() || 'Classe A';
+    const moy_t2 = normFloat(get('moy_t2'));
+    const moy_t1 = normFloat(get('moy_t1'));
+    const absences = parseInt(get('absences')) || 0;
+    if (!nom || !prenom) { removed++; return; }
+    if (moy_t2 === null) { removed++; return; }
+    const key = nom + '|' + prenom;
+    if (seen.has(key)) { fixes.push('Doublon: ' + prenom + ' ' + nom); return; }
+    seen.add(key);
+    const delta = moy_t1 !== null ? Math.round((moy_t2 - moy_t1) * 10) / 10 : null;
+    students.push({
+      nom, prenom, classe, avg: moy_t2, t1: moy_t1, delta, abs: absences,
+      done: false, comment: '', t1comment: '',
+      curseurs: {travail:2, attitude:2, participation:1, autonomie:1, methode:2, progres: delta===null?1:delta>=1?2:delta<=-1?0:1}
+    });
+  });
+  return { students, fixes, removed };
+}
+function loadDemo() {
+  STUDENTS = [
+    {nom:'Martin', prenom:'Lucas', classe:'3ème A', avg:14.2, t1:13.1, delta:1.1, abs:2, done:false, comment:'', t1comment:'Élève sérieux qui fournit des efforts réguliers. Quelques lacunes sur les fractions à consolider.', curseurs:{travail:2,attitude:2,participation:1,autonomie:1,methode:2,progres:2}},
+    {nom:'Bernard', prenom:'Chloé', classe:'3ème A', avg:17.8, t1:16.5, delta:1.3, abs:0, done:false, comment:'', t1comment:'Chloé est une élève très investie, dont les résultats témoignent d\'un travail rigoureux et constant.', curseurs:{travail:3,attitude:3,participation:3,autonomie:2,methode:3,progres:2}},
+    {nom:'Petit', prenom:'Nathan', classe:'3ème A', avg:8.3, t1:9.1, delta:-0.8, abs:8, done:false, comment:'', t1comment:'Des résultats insuffisants malgré quelques efforts ponctuels. Les absences répétées pénalisent la progression.', curseurs:{travail:1,attitude:1,participation:0,autonomie:0,methode:1,progres:0}},
+    {nom:'Dupuis', prenom:'Emma', classe:'3ème A', avg:15.5, t1:14.8, delta:0.7, abs:1, done:false, comment:'', t1comment:'Emma fait preuve d\'une bonne rigueur dans son travail. Elle progresse régulièrement et s\'investit avec sérieux.', curseurs:{travail:2,attitude:3,participation:2,autonomie:2,methode:2,progres:2}},
+    {nom:'Moreau', prenom:'Théo', classe:'3ème A', avg:11.2, t1:10.5, delta:0.7, abs:3, done:false, comment:'', t1comment:'Des bases fragiles qui nécessitent un travail plus régulier.', curseurs:{travail:1,attitude:2,participation:1,autonomie:1,methode:1,progres:2}},
+    {nom:'Laurent', prenom:'Léa', classe:'3ème A', avg:13.7, t1:13.9, delta:-0.2, abs:0, done:false, comment:'', t1comment:'Léa travaille sérieusement et obtient des résultats corrects.', curseurs:{travail:2,attitude:2,participation:2,autonomie:2,methode:2,progres:1}},
+    {nom:'Simon', prenom:'Hugo', classe:'3ème A', avg:9.1, t1:8.8, delta:0.3, abs:5, done:false, comment:'', t1comment:'Hugo peine à s\'investir. Ses absences freinent sa progression.', curseurs:{travail:1,attitude:1,participation:1,autonomie:0,methode:1,progres:1}},
+    {nom:'Michel', prenom:'Camille', classe:'3ème A', avg:16.4, t1:15.2, delta:1.2, abs:1, done:false, comment:'', t1comment:'Camille affiche de bons résultats et une implication sérieuse.', curseurs:{travail:3,attitude:3,participation:2,autonomie:2,methode:3,progres:2}},
+  ];
+  saveData(); updateDashboard();
+  document.getElementById('imp-res').innerHTML = `<div class="success-box">✓ 8 élèves démo chargés — 3ème A</div><button class="btn-p" onclick="openClass('3ème A');go('cl')" style="margin-top:8px">Voir les élèves →</button>`;
+}
+
+// ─── CLASSES ───────────────────────────────────────────────────────────────────
+function renderClassList() {
+  const classes = [...new Set(STUDENTS.map(s => s.classe))];
+  if (!classes.length) {
+    document.getElementById('v-cls-grid').innerHTML = `<div class="cc" style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text3)">Aucune classe. <span style="color:var(--green);cursor:pointer;text-decoration:underline" onclick="go('imp')">Importez un fichier</span> pour commencer.</div>`;
+  } else {
+    document.getElementById('v-cls-grid').innerHTML = classes.map(cls => {
+      const stu = STUDENTS.filter(s => s.classe === cls);
+      const d = stu.filter(s => s.done).length;
+      const pct = stu.length ? Math.round(d / stu.length * 100) : 0;
+      return `<div class="cc" onclick="openClass('${cls}')"><div class="cc-n">${cls}</div><div class="cc-s">${stu.length} élèves</div><div class="cc-bar"><div class="cc-fill" style="width:${pct}%"></div></div><div style="font-size:11px;color:var(--text3);margin-top:4px">${d} / ${stu.length}</div></div>`;
+    }).join('');
+  }
+}
+function openClass(cls) {
+  curClass = cls; go('cl');
+  document.getElementById('v-cls').style.display = 'none';
+  document.getElementById('v-stu').style.display = 'block';
+  document.getElementById('v-pro').style.display = 'none';
+  document.getElementById('tbt').textContent = cls;
+  document.getElementById('tbs').textContent = 'Mathématiques — T2';
+  renderStudents();
+}
+function showCls() {
+  document.getElementById('v-cls').style.display = 'block';
+  document.getElementById('v-stu').style.display = 'none';
+  document.getElementById('v-pro').style.display = 'none';
+  renderClassList();
+}
+function showStu() {
+  document.getElementById('v-stu').style.display = 'block';
+  document.getElementById('v-pro').style.display = 'none';
+  document.getElementById('tbt').textContent = curClass;
+}
+function renderStudents() {
+  const list = STUDENTS.filter(s => s.classe === curClass);
+  const init = s => (s.prenom[0] + s.nom[0]).toUpperCase();
+  const delta = s => {
+    if (s.delta === null) return `<span class="badge bg">—</span>`;
+    return s.delta > 0 ? `<span class="badge bs">+${s.delta}</span>` : s.delta < 0 ? `<span class="badge bd">${s.delta}</span>` : `<span class="badge bg">=</span>`;
+  };
+  document.getElementById('stu-content').innerHTML = `
+    <div class="sec">Élèves de ${curClass} (${list.length})</div>
+    <div class="slist">${list.map(s => `
+      <div class="srow" onclick="openStudent('${s.nom}','${s.prenom}')">
+        <div class="av">${init(s)}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text)">${s.prenom} ${s.nom}</div>
+        <div style="flex:1"></div>
+        ${s.abs > 0 ? `<span class="badge bw" style="margin-right:4px">${s.abs}abs</span>` : ''}
+        ${delta(s)}
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-left:7px">${s.avg}/20</div>
+        <div style="margin-left:9px">${s.done ? '<span class="badge bs">✓</span>' : '<span class="badge bg">à rédiger</span>'}</div>
+      </div>`).join('')}
+    </div>`;
+}
+function openStudent(nom, prenom) {
+  curStudent = STUDENTS.find(s => s.nom === nom && s.prenom === prenom);
+  variants = []; selIdx = null; kwExpanded = false;
+  document.getElementById('v-stu').style.display = 'none';
+  document.getElementById('v-pro').style.display = 'block';
+  document.getElementById('tbt').textContent = prenom + ' ' + nom;
+  document.getElementById('tbs').textContent = curClass + ' — Profil élève';
+  renderProfile();
+}
+
+// ─── PROFIL ÉLÈVE ──────────────────────────────────────────────────────────────
+function renderProfile() {
+  const s = curStudent;
+  const d = s.delta !== null ? (s.delta > 0 ? '+' + s.delta : String(s.delta)) : '—';
+  const init = (s.prenom[0] + s.nom[0]).toUpperCase();
+  document.getElementById('pro-content').innerHTML = `
+    <div class="ph">
+      <div class="pav">${init}</div>
+      <div>
+        <div style="font-size:16px;font-weight:600;color:var(--text)">${s.prenom} ${s.nom}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">${curClass} · T2 : <strong>${s.avg}/20</strong> · ${d} vs T1 · ${s.abs} abs.</div>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:4px">
+        <div class="pill on ttab" onclick="setTri(this)">T1</div>
+        <div class="pill ttab" onclick="setTri(this)">T2</div>
+        <div class="pill ttab" onclick="setTri(this)">T3</div>
+      </div>
+    </div>
+    <div class="three-col">
+      <div>
+        <div class="card">
+          <div class="sec">Curseurs pédagogiques</div>
+          ${Object.keys(s.curseurs).map(k => `<div class="cur-row">
+            <div class="cur-lbl"><span>${k.charAt(0).toUpperCase()+k.slice(1)}</span><span id="cl-${k}">${CL[k][s.curseurs[k]]}</span></div>
+            <div class="cur-track" onclick="setCur('${k}',event,this)">
+              <div class="cur-fill" id="cf-${k}" style="width:${s.curseurs[k]/3*100}%"></div>
+              <div class="cur-thumb" id="ct-${k}" style="left:${s.curseurs[k]/3*100}%"></div>
+            </div></div>`).join('')}
+        </div>
+        <div class="card">
+          <div class="sec">Historique</div>
+          <div class="hl">T1${s.t1 ? ' — ' + s.t1 + '/20' : ''}</div>
+          <div class="hc">${s.t1comment || '<em style="color:var(--text3)">Aucun commentaire T1.</em>'}</div>
+          <div class="hl" style="margin-top:0.5rem">T2 — ${s.avg}/20 <span style="font-weight:400">${s.done ? '✓ rédigé' : 'à rédiger'}</span></div>
+          <div class="hc t2active" id="hc-t2">${s.comment || '<em style="color:var(--text3)">En attente…</em>'}</div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="sec">Mots clés</div>
+          <div id="kw-preview-wrap">
+            <div style="display:flex;flex-wrap:wrap;gap:4px;min-height:24px" id="kw-preview"></div>
+            <div style="margin-top:0.5rem"><span class="toggle-lnk" onclick="toggleKWPanel()">✎ Modifier les mots clés</span></div>
+          </div>
+          <div id="kw-panel" style="display:none">
+            <div class="cat-tabs" id="cat-tabs-p"></div>
+            <div class="kw-list" id="kw-list-p"></div>
+            <div class="add-row">
+              <input class="add-inp" id="add-inp-p" placeholder="Nouveau mot clé…" onkeydown="if(event.key==='Enter')addKW()">
+              <button class="add-btn" onclick="addKW()">+</button>
+            </div>
+            <div style="margin-top:0.5rem"><span class="toggle-lnk" onclick="toggleKWPanel()">← Réduire</span></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="sec">Générer</div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Ton</div>
+          <div class="pill-row" id="pr-tone" style="margin-bottom:0.5rem">
+            ${['bienveillant','neutre','ferme'].map(t => `<div class="pill ${t===tone?'on':''}" onclick="setTone('${t}',this)">${t}</div>`).join('')}
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Longueur</div>
+          <div class="pill-row" id="pr-len" style="margin-bottom:0.5rem">
+            ${['court','standard','long'].map(l => `<div class="pill ${l===varLen?'on':''}" onclick="setVLen('${l}',this)">${l}</div>`).join('')}
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Variantes</div>
+          <div class="pill-row" id="pr-nb" style="margin-bottom:0.5rem">
+            ${[2,3].map(n => `<div class="pill ${n===varNb?'on':''}" onclick="setVNb(${n},this)">${n}</div>`).join('')}
+          </div>
+          <button class="gen-btn" id="gbtn" onclick="genVariants()">
+            <span id="gico">✦</span><span id="gtxt">Générer les variantes</span>
+          </button>
+          <div id="valerts"></div>
+          <div id="vlist"><div style="font-size:12px;color:var(--text3);padding:0.3rem 0">Les variantes apparaîtront ici.</div></div>
+        </div>
+        <div class="card" id="final-card" style="display:none;margin-top:0.9rem">
+          <div class="sec">Commentaire sélectionné</div>
+          <div id="scores-wrap" style="margin-bottom:0.6rem"></div>
+          <textarea class="final-ta" id="fta"></textarea>
+          <div class="act-row">
+            <button class="act p" onclick="copyFinal()">Copier</button>
+            <button class="act" onclick="saveFinal()">Enregistrer T2</button>
+            <button class="act" onclick="exportOne()">Export CSV</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  renderKWPreview();
+}
+function setTri(el) { document.querySelectorAll('.ttab').forEach(t => t.classList.remove('on')); el.classList.add('on'); }
+function setCur(k, e, track) {
+  const r = track.getBoundingClientRect();
+  const v = Math.round(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * 3);
+  curStudent.curseurs[k] = v;
+  document.getElementById('cf-' + k).style.width = (v/3*100) + '%';
+  document.getElementById('ct-' + k).style.left = (v/3*100) + '%';
+  document.getElementById('cl-' + k).textContent = CL[k][v];
+  saveData();
+}
+function setTone(t, el) { tone = t; document.querySelectorAll('#pr-tone .pill').forEach(p => p.classList.remove('on')); el.classList.add('on'); }
+function setVLen(l, el) { varLen = l; document.querySelectorAll('#pr-len .pill').forEach(p => p.classList.remove('on')); el.classList.add('on'); }
+function setVNb(n, el) { varNb = n; document.querySelectorAll('#pr-nb .pill').forEach(p => p.classList.remove('on')); el.classList.add('on'); }
+
+// ─── MOTS CLÉS ─────────────────────────────────────────────────────────────────
+function getActiveKWs() {
+  const all = [];
+  CATS.forEach(c => { KWS[c.id].filter(k => k.active).forEach(k => all.push({...k, cat:c})); });
+  return all.sort((a,b) => b.weight - a.weight);
+}
+function renderKWPreview() {
+  const el = document.getElementById('kw-preview'); if (!el) return;
+  const all = getActiveKWs();
+  el.innerHTML = all.map(k => `<span style="padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;background:${k.cat.bg};color:${k.cat.color};border:1px solid ${k.cat.border};opacity:${k.weight===3?1:k.weight===2?.72:.45}">${k.text}</span>`).join('') || '<span style="font-size:12px;color:var(--text3)">Aucun mot clé actif.</span>';
+}
+function toggleKWPanel() {
+  kwExpanded = !kwExpanded;
+  document.getElementById('kw-preview-wrap').style.display = kwExpanded ? 'none' : 'block';
+  document.getElementById('kw-panel').style.display = kwExpanded ? 'block' : 'none';
+  if (kwExpanded) { renderCatTabs(); renderKWList(); } else { renderKWPreview(); }
+}
+function renderCatTabs() {
+  const el = document.getElementById('cat-tabs-p'); if (!el) return;
+  el.innerHTML = CATS.map(c => {
+    const cnt = KWS[c.id].filter(k => k.active).length;
+    return `<div class="ctab ${c.id===curCat?'on':''}" style="${c.id===curCat?`background:${c.bg};color:${c.color};border-color:${c.border}`:''}" onclick="setCatP('${c.id}')">${c.label}${cnt>0?` <span style="background:${c.color}22;color:${c.color};padding:1px 5px;border-radius:99px;font-size:10px">${cnt}</span>`:''}</div>`;
+  }).join('');
+}
+function renderKWList() {
+  const el = document.getElementById('kw-list-p'); if (!el) return;
+  el.innerHTML = KWS[curCat].map(k => `<div class="kw-row ${k.active?'active':''}">
+    <div class="kw-chk ${k.active?'on':''}" onclick="toggleKWI(${k.id})"></div>
+    <input class="kw-inp" value="${k.text}" onchange="renameKW(${k.id},this.value)">
+    <div class="w-dots">${[1,2,3].map(n=>`<div class="w-dot ${k.weight>=n?'on':''}" onclick="setWt(${k.id},${n})"></div>`).join('')}</div>
+    <div class="w-lbl" style="color:${k.weight===3?'var(--green-d)':k.weight===2?'var(--amber)':'var(--text3)'}">${['','faible','moyen','fort'][k.weight]}</div>
+    <button class="kw-del" onclick="delKW(${k.id})">×</button>
+  </div>`).join('');
+}
+function setCatP(id) { curCat = id; renderCatTabs(); renderKWList(); }
+function toggleKWI(id) { for(const c in KWS){const k=KWS[c].find(x=>x.id===id);if(k){k.active=!k.active;break;}} renderKWList(); renderCatTabs(); saveData(); }
+function setWt(id,w) { for(const c in KWS){const k=KWS[c].find(x=>x.id===id);if(k){k.weight=w;break;}} renderKWList(); saveData(); }
+function renameKW(id,val) { for(const c in KWS){const k=KWS[c].find(x=>x.id===id);if(k){k.text=val.trim()||k.text;break;}} saveData(); }
+function delKW(id) { for(const c in KWS){const i=KWS[c].findIndex(x=>x.id===id);if(i>=0){KWS[c].splice(i,1);break;}} renderKWList(); renderCatTabs(); saveData(); }
+function addKW() { const inp=document.getElementById('add-inp-p'); const val=inp.value.trim(); if(!val)return; KWS[curCat].push({id:nextKwId++,text:val,active:true,weight:2}); inp.value=''; renderKWList(); renderCatTabs(); saveData(); }
+
+// ─── GÉNÉRATION IA ──────────────────────────────────────────────────────────────
+function similarity(a,b) {
+  const wa = new Set(a.toLowerCase().replace(/[.,!?;:]/g,'').split(/\s+/).filter(w=>w.length>4));
+  const wb = new Set(b.toLowerCase().replace(/[.,!?;:]/g,'').split(/\s+/).filter(w=>w.length>4));
+  const inter = [...wa].filter(w=>wb.has(w));
+  const union = new Set([...wa,...wb]);
+  return union.size===0?0:Math.round(inter.length/union.size*100);
+}
+function highlight(t2, t1) {
+  if (!t1) return t2;
+  const t1w = new Set(t1.toLowerCase().replace(/[.,!?;:]/g,'').split(/\s+/).filter(w=>w.length>4));
+  return t2.replace(/\b(\w{5,})\b/g, m => t1w.has(m.toLowerCase()) ? `<mark class="rep">${m}</mark>` : m);
+}
+function scCls(v) { return v>=80?'sg':v>=60?'sa':'sr'; }
+function scColor(v) { return v>=80?'var(--green)':v>=60?'var(--amber-b)':'#E24B4A'; }
+
+async function callAPI(prompt, maxTokens) {
+  const key = getApiKey();
+  if (!key) { openApiModal(); throw new Error('Clé API manquante'); }
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+    body: JSON.stringify({ model: 'claude-opus-4-6', max_tokens: maxTokens, messages: [{role:'user', content:prompt}] })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || 'Erreur API ' + res.status);
+  }
+  const data = await res.json();
+  return (data.content?.map(b => b.text||'').join('') || '').trim();
+}
+
+async function genVariants() {
+  const btn=document.getElementById('gbtn'); const ico=document.getElementById('gico'); const txt=document.getElementById('gtxt');
+  btn.disabled=true; ico.innerHTML='<span class="spin"></span>'; txt.textContent='Génération…';
+  document.getElementById('vlist').innerHTML='<div style="font-size:12px;color:var(--text3);padding:0.3rem 0">Génération de '+varNb+' variantes…</div>';
+  document.getElementById('final-card').style.display='none';
+  document.getElementById('valerts').innerHTML=''; variants=[]; selIdx=null;
+
+  const s = curStudent;
+  const d = s.delta !== null ? (s.delta>0?'+'+s.delta:String(s.delta)) : '—';
+  const kwAll = getActiveKWs();
+  const kwDesc = kwAll.map(k=>`"${k.text}" (${k.cat.label}, importance:${['','faible','moyenne','forte'][k.weight]})`).join('\n');
+  const curStr = Object.entries(s.curseurs).map(([k,v])=>k+':'+CL[k][v]).join(', ');
+  const lenMap = {court:'1-2 phrases', standard:'2-3 phrases', long:'3-4 phrases'};
+  const usedWords = s.t1comment ? [...new Set(s.t1comment.toLowerCase().replace(/[.,!?;:]/g,'').split(/\s+/).filter(w=>w.length>5))].slice(0,10).join(', ') : '';
+
+  const prompt = `Assistant pédagogique. Génère ${varNb} variantes de commentaires de bulletin scolaire en français.
+Élève: ${s.prenom} ${s.nom} — ${curClass}
+T2: ${s.avg}/20 (T1: ${s.t1||'?'}/20, évolution: ${d}) — Absences: ${s.abs}
+Curseurs: ${curStr}
+Ton: ${tone} — Longueur: ${lenMap[varLen]}
+${kwDesc?'Mots clés (forte=obligatoire, moyenne=si possible, faible=optionnel):\n'+kwDesc:''}
+${s.t1comment?'Commentaire T1 à NE PAS répéter: "'+s.t1comment+'"\nMots à éviter: '+usedWords:''}
+Règle: chaque variante doit être réellement différente et éviter les formulations du T1.
+Réponds UNIQUEMENT en JSON sans backticks:
+{"variants":[{"id":1,"text":"...","scores":{"originalite":88,"coherence":91,"pertinence":87},"alert":""}]}`;
+
+  try {
+    const raw = await callAPI(prompt, 1000);
+    variants = JSON.parse(raw.replace(/```json|```/g,'').trim()).variants || [];
+    renderVariants();
+  } catch(e) {
+    document.getElementById('vlist').innerHTML = `<div class="alert-box">Erreur : ${e.message}</div>`;
+  }
+  btn.disabled=false; ico.textContent='✦'; txt.textContent='Regénérer';
+}
+
+function renderVariants() {
+  const s = curStudent;
+  document.getElementById('vlist').innerHTML = variants.map((v,i) => {
+    const sim = s.t1comment ? similarity(s.t1comment, v.text) : 0;
+    const orig = 100 - sim;
+    const isWarn = orig < 60;
+    const hl = highlight(v.text, s.t1comment);
+    return `<div class="vcard ${isWarn?'flagged':''}" id="vc-${i}" onclick="selVariant(${i})">
+      <div class="vhdr">
+        <div class="vnum ${isWarn?'w':''}">${i+1}</div>
+        <div style="font-size:12px;font-weight:600;color:var(--text)">Variante ${i+1}</div>
+        <div style="display:flex;gap:3px;margin-left:auto;flex-wrap:wrap">
+          <span class="sp ${scCls(orig)}">Orig. ${orig}%</span>
+          <span class="sp ${scCls(v.scores.coherence)}">Coh. ${v.scores.coherence}%</span>
+          <span class="sp ${scCls(v.scores.pertinence)}">Pert. ${v.scores.pertinence}%</span>
+        </div>
+      </div>
+      ${isWarn?'<div class="alert-box" style="font-size:11px;margin-bottom:5px">⚠ Formulations proches du T1</div>':''}
+      ${v.alert?`<div class="alert-box" style="font-size:11px;margin-bottom:5px">⚠ ${v.alert}</div>`:''}
+      <div class="vt">${hl}</div>
+    </div>`;
+  }).join('');
+}
+function selVariant(i) {
+  variants.forEach((_,j) => { const c=document.getElementById('vc-'+j); if(c) c.classList.toggle('sel',j===i); });
+  selIdx=i; const v=variants[i];
+  document.getElementById('fta').value = v.text;
+  document.getElementById('final-card').style.display = 'block';
+  const bars = [{l:'Originalité',v:100-similarity(curStudent.t1comment||'',v.text)},{l:'Cohérence',v:v.scores.coherence},{l:'Pertinence',v:v.scores.pertinence}];
+  document.getElementById('scores-wrap').innerHTML = bars.map(b=>`<div class="sb-row"><div class="sb-l">${b.l}</div><div class="sb-t"><div class="sb-f" style="width:${b.v}%;background:${scColor(b.v)}"></div></div><div class="sb-v">${b.v}%</div></div>`).join('');
+}
+function copyFinal() {
+  const t=document.getElementById('fta').value;
+  if(t) navigator.clipboard.writeText(t).catch(()=>{});
+  const b=event.target; const o=b.textContent; b.textContent='Copié !'; setTimeout(()=>b.textContent=o,1400);
+}
+function saveFinal() {
+  const t=document.getElementById('fta').value.trim(); if(!t) return;
+  curStudent.comment=t; curStudent.done=true;
+  document.getElementById('hc-t2').innerHTML=t;
+  saveData(); updateDashboard();
+  const b=event.target; const o=b.textContent; b.textContent='Enregistré ✓'; setTimeout(()=>{b.textContent=o;renderStudents();},1400);
+}
+function exportOne() {
+  const t=document.getElementById('fta')?.value; if(!t) return;
+  const s=curStudent;
+  const blob=new Blob([`Élève,Classe,Trimestre,Commentaire\n"${s.prenom} ${s.nom}","${curClass}","T2","${t.replace(/"/g,'""')}"`],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`commentaire_${s.nom}_T2.csv`; a.click(); URL.revokeObjectURL(url);
+}
+
+// ─── GÉNÉRATION EN MASSE ────────────────────────────────────────────────────────
+function getMassStudents() { return mFiltV==='restants' ? STUDENTS.filter(s=>s.classe===mClass&&!s.done) : STUDENTS.filter(s=>s.classe===mClass); }
+function renderMassConfig() {
+  const classes = [...new Set(STUDENTS.map(s => s.classe))];
+  if (!mClass && classes.length) mClass = classes[0];
+  document.getElementById('m-cls-pills').innerHTML = classes.map(cls => `<div class="pill ${cls===mClass?'on':''}" onclick="mSetCls('${cls}',this)">${cls}</div>`).join('') || '<span style="font-size:13px;color:var(--text3)">Aucune classe — importez d\'abord des élèves.</span>';
+  renderMassPreview();
+}
+function mSetCls(cls,el) { mClass=cls; document.querySelectorAll('#m-cls-pills .pill').forEach(p=>p.classList.remove('on')); el.classList.add('on'); renderMassPreview(); }
+function mTone(t,el) { mToneV=t; document.querySelectorAll('#m-tone .pill').forEach(p=>p.classList.remove('on')); el.classList.add('on'); }
+function mLen(l,el) { mLenV=l; document.querySelectorAll('#m-len .pill').forEach(p=>p.classList.remove('on')); el.classList.add('on'); }
+function mFilt(f,el) { mFiltV=f; document.querySelectorAll('#m-filt .pill').forEach(p=>p.classList.remove('on')); el.classList.add('on'); renderMassPreview(); }
+function renderMassPreview() {
+  const list = getMassStudents();
+  const done = list.filter(s=>s.done).length;
+  document.getElementById('m-nb').textContent = list.length;
+  document.getElementById('m-done-nb').textContent = done;
+  document.getElementById('m-todo').textContent = list.length - done;
+  document.getElementById('m-est').textContent = Math.max(1, Math.ceil(list.length*0.3));
+  document.getElementById('m-preview').innerHTML = list.map(s => {
+    const d = s.delta !== null ? (s.delta>0?'+'+s.delta:String(s.delta)) : '—';
+    return `<div class="srow" style="cursor:default">
+      <div class="av">${(s.prenom[0]+s.nom[0]).toUpperCase()}</div>
+      <div><div style="font-size:13px;font-weight:600;color:var(--text)">${s.prenom} ${s.nom}</div><div style="font-size:12px;color:var(--text3)">${s.avg}/20 · ${d}</div></div>
+      <div style="flex:1"></div>
+      ${s.abs>0?`<span class="badge bw" style="margin-right:4px">${s.abs}abs</span>`:''}
+      ${s.done?'<span class="badge bs">✓</span>':'<span class="badge bg">à générer</span>'}
+    </div>`;
+  }).join('') || '<div style="padding:1rem;font-size:13px;color:var(--text3)">Aucun élève dans cette classe.</div>';
+}
+async function massStart() {
+  const list = getMassStudents(); if (!list.length) return;
+  if (!getApiKey()) { openApiModal(); return; }
+  document.getElementById('m-config').style.display='none';
+  document.getElementById('m-running').style.display='block';
+  document.getElementById('m-results').style.display='none';
+  document.getElementById('m-run-list').innerHTML = list.map(s => `<div class="mass-row" id="mr-${s.nom+s.prenom}">
+    <div class="av">${(s.prenom[0]+s.nom[0]).toUpperCase()}</div>
+    <div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--text)">${s.prenom} ${s.nom} <span style="font-size:12px;font-weight:400;color:var(--text3)">${s.avg}/20</span></div>
+    <div class="cp" id="mc-${s.nom+s.prenom}">En attente…</div></div>
+    <div class="si si-w" id="ms-${s.nom+s.prenom}">–</div></div>`).join('');
+
+  for (let i=0; i<list.length; i++) {
+    const s = list[i]; const key = s.nom+s.prenom;
+    document.getElementById('m-bar').style.width = Math.round(i/list.length*100)+'%';
+    document.getElementById('m-cnt').textContent = i+' / '+list.length;
+    document.getElementById('m-status').textContent = 'Génération : '+s.prenom+' '+s.nom+'…';
+    document.getElementById('mc-'+key).textContent = 'Génération…';
+    document.getElementById('ms-'+key).className='si si-p';
+    document.getElementById('ms-'+key).innerHTML='<span class="spin" style="border-color:rgba(29,158,117,.3);border-top-color:var(--green)"></span>';
+    try {
+      const c = await genOneComment(s);
+      s.comment=c; s.done=true;
+      const el=document.getElementById('mc-'+key); el.textContent=c; el.className='cp done';
+      document.getElementById('ms-'+key).className='si si-d'; document.getElementById('ms-'+key).textContent='✓';
+      saveData();
+    } catch(e) {
+      document.getElementById('mc-'+key).textContent='Erreur : '+e.message;
+      document.getElementById('ms-'+key).className='si si-e'; document.getElementById('ms-'+key).textContent='!';
+    }
+    await new Promise(r=>setTimeout(r,100));
+  }
+  document.getElementById('m-bar').style.width='100%';
+  document.getElementById('m-cnt').textContent=list.length+' / '+list.length;
+  await new Promise(r=>setTimeout(r,400));
+  showMassResults(list);
+  updateDashboard();
+}
+async function genOneComment(s) {
+  const d = s.delta !== null ? (s.delta>0?'+'+s.delta:String(s.delta)) : '—';
+  const curStr = Object.entries(s.curseurs).map(([k,v])=>k+':'+CL[k][v]).join(', ');
+  const lenMap = {court:'1-2 phrases', standard:'2-3 phrases', long:'3-4 phrases'};
+  const usedWords = s.t1comment ? [...new Set(s.t1comment.toLowerCase().replace(/[.,!?;:]/g,'').split(/\s+/).filter(w=>w.length>5))].slice(0,8).join(', ') : '';
+  const prompt = `Commentaire de bulletin scolaire en français. ${s.prenom} ${s.nom}, ${mClass}. T2:${s.avg}/20 (T1:${s.t1||'?'}/20, ${d}). Absences:${s.abs}. Curseurs:${curStr}. Ton:${mToneV}. Longueur:${lenMap[mLenV]}.${s.t1comment?' T1 à ne pas répéter:"'+s.t1comment+'". Éviter:'+usedWords+'.':''} Réponds UNIQUEMENT avec le commentaire.`;
+  return await callAPI(prompt, 300);
+}
+function showMassResults(list) {
+  document.getElementById('m-running').style.display='none';
+  document.getElementById('m-results').style.display='block';
+  const ok = list.filter(s=>s.comment).length;
+  document.getElementById('m-res-title').textContent = ok+' commentaires générés sur '+list.length;
+  document.getElementById('m-res-sub').textContent = mClass+' — T2 — Ton: '+mToneV+' — Longueur: '+mLenV;
+  document.getElementById('m-res-list').innerHTML = list.map((s,i) => `<div class="mass-row">
+    <div class="av">${(s.prenom[0]+s.nom[0]).toUpperCase()}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:600;color:var(--text)">${s.prenom} ${s.nom} <span style="font-size:12px;font-weight:400;color:var(--text3)">${s.avg}/20</span></div>
+      <div id="rv-${i}" class="cp done" style="margin-top:4px">${s.comment||'Non généré'}</div>
+      <div id="re-${i}" style="display:none">
+        <textarea style="width:100%;margin-top:4px;padding:6px 8px;font-size:12px;line-height:1.55;border:1px solid var(--green-b);border-radius:var(--radius-sm);resize:vertical;font-family:inherit;color:var(--text);background:var(--surface);min-height:55px" id="rt-${i}">${s.comment}</textarea>
+        <div style="display:flex;gap:5px;margin-top:3px">
+          <button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="saveEdit(${i},list)">Enregistrer</button>
+          <button class="btn-s" style="font-size:11px;padding:3px 9px" onclick="cancelEdit(${i})">Annuler</button>
+        </div>
+      </div>
+      <span class="toggle-lnk" style="display:inline-block;margin-top:3px" onclick="editRes(${i})">✎ Modifier</span>
+    </div>
+    <button class="btn-s" style="font-size:11px;padding:3px 9px;flex-shrink:0;margin-top:2px" onclick="copyOne(${i})">Copier</button>
+  </div>`).join('');
+  window._massListRef = list;
+}
+function editRes(i) { document.getElementById('rv-'+i).style.display='none'; document.getElementById('re-'+i).style.display='block'; }
+function cancelEdit(i) { document.getElementById('rv-'+i).style.display='block'; document.getElementById('re-'+i).style.display='none'; }
+function saveEdit(i) {
+  const val = document.getElementById('rt-'+i).value.trim();
+  if (val && window._massListRef?.[i]) { window._massListRef[i].comment=val; document.getElementById('rv-'+i).textContent=val; saveData(); }
+  cancelEdit(i);
+}
+function copyOne(i) {
+  const t = window._massListRef?.[i]?.comment;
+  if (t) navigator.clipboard.writeText(t).catch(()=>{});
+  const b=event.target; const o=b.textContent; b.textContent='✓'; setTimeout(()=>b.textContent=o,1200);
+}
+function exportAll() {
+  const list = STUDENTS.filter(s=>s.classe===mClass&&s.comment);
+  if (!list.length) return;
+  const rows = list.map(s=>`"${s.prenom} ${s.nom}","${s.classe}","T2","${s.comment.replace(/"/g,'""')}"`);
+  const blob = new Blob(['Élève,Classe,Trimestre,Commentaire\n'+rows.join('\n')],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`commentaires_${mClass.replace(/\s/g,'')}_T2.csv`; a.click(); URL.revokeObjectURL(url);
+}
+function copyAll() {
+  const list = STUDENTS.filter(s=>s.classe===mClass&&s.comment);
+  const all = list.map(s=>`${s.prenom} ${s.nom} :\n${s.comment}`).join('\n\n');
+  if (all) navigator.clipboard.writeText(all).catch(()=>{});
+  const b=event.target; const o=b.textContent; b.textContent='Copié !'; setTimeout(()=>b.textContent=o,1400);
+}
+function mReset() {
+  document.getElementById('m-config').style.display='block';
+  document.getElementById('m-running').style.display='none';
+  document.getElementById('m-results').style.display='none';
+  renderMassPreview();
+}
+
+// ─── INIT ──────────────────────────────────────────────────────────────────────
+loadData();
+updateApiStatus();
+updateDashboard();
+if (window.innerWidth <= 768) {
+  document.getElementById('menu-btn').style.display = 'block';
+}
+if (!getApiKey()) {
+  setTimeout(() => openApiModal(), 800);
+}
+</script>
+</body>
+</html>
