@@ -2038,27 +2038,30 @@ document.addEventListener('DOMContentLoaded',()=>{});
 
 
 <script>
-// Enregistrement du Service Worker pour PWA
+// Service Worker SANS cache — toujours la dernière version en ligne
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
-    // SW inline via blob
     const swCode=`
 self.addEventListener('install', e=>self.skipWaiting());
-self.addEventListener('activate', e=>clients.claim());
+self.addEventListener('activate', e=>{
+  // Supprimer tous les caches existants
+  e.waitUntil(caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))));
+  clients.claim();
+});
 self.addEventListener('fetch', e=>{
-  if(e.request.method!=='GET')return;
-  e.respondWith(
-    caches.open('notae-v1').then(cache=>
-      fetch(e.request).then(resp=>{cache.put(e.request,resp.clone());return resp;})
-      .catch(()=>caches.match(e.request))
-    )
-  );
+  // Ne jamais cacher — toujours aller chercher sur le réseau
+  e.respondWith(fetch(e.request));
 });`;
     const blob=new Blob([swCode],{type:'application/javascript'});
     const url=URL.createObjectURL(blob);
-    navigator.serviceWorker.register(url).then(()=>{
-      console.log('Notae IA : Service Worker actif');
+    navigator.serviceWorker.register(url).then(reg=>{
+      // Vérifier les mises à jour à chaque ouverture
+      reg.update();
     }).catch(()=>{});
+    // Recharger si nouvelle version détectée
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      window.location.reload();
+    });
   });
 }
 
